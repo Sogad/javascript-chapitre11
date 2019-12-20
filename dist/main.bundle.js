@@ -95,9 +95,11 @@
 
 // Imports
 var ___CSS_LOADER_API_IMPORT___ = __webpack_require__(/*! ../node_modules/css-loader/dist/runtime/api.js */ "./node_modules/css-loader/dist/runtime/api.js");
-exports = module.exports = ___CSS_LOADER_API_IMPORT___(false);
+exports = ___CSS_LOADER_API_IMPORT___(false);
 // Module
-exports.push([module.i, ".container {\n  border: 1px solid red;\n}\n", ""]);
+exports.push([module.i, ".red {\n  background: red;\n}\n\n.text-primary {\n  color: blue;\n}\n", ""]);
+// Exports
+module.exports = exports;
 
 
 /***/ }),
@@ -241,80 +243,56 @@ var getTarget = function getTarget() {
   };
 }();
 
-function listToStyles(list, options) {
-  var styles = [];
-  var newStyles = {};
+function addModulesToDom(id, list, options) {
+  id = options.base ? id + options.base : id;
+
+  if (!stylesInDom[id]) {
+    stylesInDom[id] = [];
+  }
 
   for (var i = 0; i < list.length; i++) {
     var item = list[i];
-    var id = options.base ? item[0] + options.base : item[0];
-    var css = item[1];
-    var media = item[2];
-    var sourceMap = item[3];
     var part = {
-      css: css,
-      media: media,
-      sourceMap: sourceMap
+      css: item[1],
+      media: item[2],
+      sourceMap: item[3]
     };
+    var styleInDomById = stylesInDom[id];
 
-    if (!newStyles[id]) {
-      styles.push(newStyles[id] = {
-        id: id,
-        parts: [part]
-      });
+    if (styleInDomById[i]) {
+      styleInDomById[i].updater(part);
     } else {
-      newStyles[id].parts.push(part);
+      styleInDomById.push({
+        updater: addStyle(part, options)
+      });
     }
   }
 
-  return styles;
-}
+  for (var j = list.length; j < stylesInDom[id].length; j++) {
+    stylesInDom[id][j].updater();
+  }
 
-function addStylesToDom(styles, options) {
-  for (var i = 0; i < styles.length; i++) {
-    var item = styles[i];
-    var domStyle = stylesInDom[item.id];
-    var j = 0;
+  stylesInDom[id].length = list.length;
 
-    if (domStyle) {
-      domStyle.refs++;
-
-      for (; j < domStyle.parts.length; j++) {
-        domStyle.parts[j](item.parts[j]);
-      }
-
-      for (; j < item.parts.length; j++) {
-        domStyle.parts.push(addStyle(item.parts[j], options));
-      }
-    } else {
-      var parts = [];
-
-      for (; j < item.parts.length; j++) {
-        parts.push(addStyle(item.parts[j], options));
-      }
-
-      stylesInDom[item.id] = {
-        id: item.id,
-        refs: 1,
-        parts: parts
-      };
-    }
+  if (stylesInDom[id].length === 0) {
+    delete stylesInDom[id];
   }
 }
 
 function insertStyleElement(options) {
   var style = document.createElement('style');
+  var attributes = options.attributes || {};
 
-  if (typeof options.attributes.nonce === 'undefined') {
+  if (typeof attributes.nonce === 'undefined') {
     var nonce =  true ? __webpack_require__.nc : undefined;
 
     if (nonce) {
-      options.attributes.nonce = nonce;
+      attributes.nonce = nonce;
     }
   }
 
-  Object.keys(options.attributes).forEach(function (key) {
-    style.setAttribute(key, options.attributes[key]);
+  Object.keys(attributes).forEach(function (key) {
+    style.setAttribute(key, attributes[key]);
   });
 
   if (typeof options.insert === 'function') {
@@ -381,6 +359,8 @@ function applyToTag(style, options, obj) {
 
   if (media) {
     style.setAttribute('media', media);
+  } else {
+    style.removeAttribute('media');
   }
 
   if (sourceMap && btoa) {
@@ -437,46 +417,17 @@ function addStyle(obj, options) {
   };
 }
 
-module.exports = function (list, options) {
-  options = options || {};
-  options.attributes = typeof options.attributes === 'object' ? options.attributes : {}; // Force single-tag solution on IE6-9, which has a hard limit on the # of <style>
+module.exports = function (id, list, options) {
+  options = options || {}; // Force single-tag solution on IE6-9, which has a hard limit on the # of <style>
   // tags it will allow on a page
 
   if (!options.singleton && typeof options.singleton !== 'boolean') {
     options.singleton = isOldIE();
   }
 
-  var styles = listToStyles(list, options);
-  addStylesToDom(styles, options);
+  addModulesToDom(id, list, options);
   return function update(newList) {
-    var mayRemove = [];
-
-    for (var i = 0; i < styles.length; i++) {
-      var item = styles[i];
-      var domStyle = stylesInDom[item.id];
-
-      if (domStyle) {
-        domStyle.refs--;
-        mayRemove.push(domStyle);
-      }
-    }
-
-    if (newList) {
-      var newStyles = listToStyles(newList, options);
-      addStylesToDom(newStyles, options);
-    }
-
-    for (var _i = 0; _i < mayRemove.length; _i++) {
-      var _domStyle = mayRemove[_i];
-
-      if (_domStyle.refs === 0) {
-        for (var j = 0; j < _domStyle.parts.length; j++) {
-          _domStyle.parts[j]();
-        }
-
-        delete stylesInDom[_domStyle.id];
-      }
-    }
+    addModulesToDom(id, newList || [], options);
   };
 };
 
@@ -494,23 +445,6 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _style_css__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./style.css */ "./src/style.css");
 /* harmony import */ var _style_css__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_style_css__WEBPACK_IMPORTED_MODULE_0__);
 
-var p = document.querySelector("p");
-var img = document.querySelector("img");
-var section = document.querySelector("section");
-var a = document.querySelector("a");
-var input = document.querySelector("input");
-input.focus();
-setTimeout(function () {
-  input.blur();
-}, 1000); // input.type = "password";
-// input.value = "123";
-// input.placeholder = "hello";
-// input.disabled = true;
-// input.disabled = false;
-// input.minLength = 5;
-// input.maxLength = 8;
-// input.max = 50;
-// console.log(input.validity);
 
 /***/ }),
 
@@ -521,22 +455,27 @@ setTimeout(function () {
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-var content = __webpack_require__(/*! !../node_modules/css-loader/dist/cjs.js!./style.css */ "./node_modules/css-loader/dist/cjs.js!./src/style.css");
+var api = __webpack_require__(/*! ../node_modules/style-loader/dist/runtime/injectStylesIntoStyleTag.js */ "./node_modules/style-loader/dist/runtime/injectStylesIntoStyleTag.js");
+            var content = __webpack_require__(/*! !../node_modules/css-loader/dist/cjs.js!./style.css */ "./node_modules/css-loader/dist/cjs.js!./src/style.css");
 
-if (typeof content === 'string') {
-  content = [[module.i, content, '']];
-}
+            content = content.__esModule ? content.default : content;
 
-var options = {}
+            if (typeof content === 'string') {
+              content = [[module.i, content, '']];
+            }
+
+var options = {};
 
 options.insert = "head";
 options.singleton = false;
 
-var update = __webpack_require__(/*! ../node_modules/style-loader/dist/runtime/injectStylesIntoStyleTag.js */ "./node_modules/style-loader/dist/runtime/injectStylesIntoStyleTag.js")(content, options);
+var id = "!!../node_modules/css-loader/dist/cjs.js!./style.css";
+var update = api(id, content, options);
 
-if (content.locals) {
-  module.exports = content.locals;
-}
+var exported = content.locals ? content.locals : {};
+
+module.exports = exported;
+
 
 
 /***/ })
